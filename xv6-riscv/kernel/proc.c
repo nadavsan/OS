@@ -20,6 +20,8 @@ static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
 
+char* exit_msg;
+
 // helps ensure that wakeups of wait()ing
 // parents are not lost. helps obey the
 // memory model when using p->parent.
@@ -344,7 +346,7 @@ reparent(struct proc *p)
 // An exited process remains in the zombie state
 // until its parent calls wait().
 void
-exit(int status)
+exit(int status, char* msg)
 {
   struct proc *p = myproc();
 
@@ -377,6 +379,14 @@ exit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
+  
+  // Save the exit message
+  if (msg != 0 && argstr(0, msg, MAXARG) >= 0) {
+    exit_msg = kalloc();
+    if (exit_msg != 0) {
+      safestrcpy(exit_msg, msg, PGSIZE);
+    }
+  }
 
   release(&wait_lock);
 
