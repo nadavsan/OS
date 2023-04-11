@@ -20,8 +20,6 @@ static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
 
-char* exit_msg;
-
 // helps ensure that wakeups of wait()ing
 // parents are not lost. helps obey the
 // memory model when using p->parent.
@@ -124,8 +122,10 @@ allocproc(void)
   return 0;
 
 found:
+  memset(p->exit_msg, 0, sizeof(p->exit_msg));
   p->pid = allocpid();
   p->state = USED;
+
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -167,6 +167,7 @@ freeproc(struct proc *p)
   p->pid = 0;
   p->parent = 0;
   p->name[0] = 0;
+  p->exit_msg[0] = 0;
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
@@ -380,12 +381,11 @@ exit(int status, char* msg)
   p->xstate = status;
   p->state = ZOMBIE;
   
-  // Save the exit message
+    // Save the exit message
   if (msg != 0 && argstr(0, msg, MAXARG) >= 0) {
-    exit_msg = kalloc();
-    if (exit_msg != 0) {
-      safestrcpy(exit_msg, msg, PGSIZE);
-    }
+    safestrcpy(p->exit_msg, msg, 32);
+    printf("exit_msg: %s\n", p->exit_msg);
+    printf("msg: %s\n",msg);
   }
 
   release(&wait_lock);
@@ -398,11 +398,11 @@ exit(int status, char* msg)
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
-wait(uint64 addr)
+wait(uint64 addr, uint64 msg)
 {
-  struct proc *pp;
+  struct proc *pp;//child
   int havekids, pid;
-  struct proc *p = myproc();
+  struct proc *p = myproc();//parent
 
   acquire(&wait_lock);
 
@@ -420,6 +420,13 @@ wait(uint64 addr)
           pid = pp->pid;
           if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
                                   sizeof(pp->xstate)) < 0) {
+            release(&pp->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          if (msg != 0 && copyout(p->pagetable, msg, (char *)&pp->exit_msg,
+                                    sizeof(pp->exit_msg)) < 0) {
+            printf("copyout failed\n");
             release(&pp->lock);
             release(&wait_lock);
             return -1;
@@ -443,6 +450,7 @@ wait(uint64 addr)
     sleep(p, &wait_lock);  //DOC: wait-sleep
   }
 }
+
 
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -690,4 +698,8 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+int set_ps_priority(priority){
+  
 }
