@@ -93,7 +93,7 @@ struct proc {
   int pid;                     // Process ID
   char exit_msg[32];           // Exit Message
   long long accumulator;       // Accumulator for the process
-  int ps_priority;             // Process priority
+  int ps_priority;         // Process priority
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

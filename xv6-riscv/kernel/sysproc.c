@@ -99,11 +99,11 @@ uint64 sys_memsize(void)
   return myproc()->sz;
 }
 
-uint64 sys_set_ps_priority(void)
+uint64 sys_set_ps_priority(struct proc* p, int priority)
 {
-  int priority;
   argint(0, &priority);
-  if(priority < 0 || priority > 10)
+  if(priority < 1 || priority > 10)
     return -1;
-  return set_ps_priority(priority);
+  p->ps_priority = priority;
+  return priority;
 }
