@@ -126,6 +126,8 @@ found:
   memset(p->exit_msg, 0, sizeof(p->exit_msg));
   p->pid = allocpid();
   p->state = USED;
+  p->ps_priority = 5;
+  p->accumulator=0;
 
 
   // Allocate a trapframe page.
@@ -329,7 +331,7 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
-  np->ps_priority = 5;
+  np->ps_priority = p->ps_priority;
   np->accumulator = acc;
 
   return pid;
@@ -391,8 +393,6 @@ exit(int status, char* msg)
     // Save the exit message
   if (msg != 0 && argstr(0, msg, MAXARG) >= 0) {
     safestrcpy(p->exit_msg, msg, 32);
-    printf("exit_msg: %s\n", p->exit_msg);
-    printf("msg: %s\n",msg);
   }
 
   release(&wait_lock);
@@ -466,13 +466,11 @@ wait(uint64 addr, uint64 msg)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
-void
-scheduler(void)
+void scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  int id_to_run = -1;
-  int first = 1;
+  struct proc* p_to_run = 0;
   
   c->proc = 0;
   for(;;){
@@ -480,39 +478,35 @@ scheduler(void)
     intr_on();
     acc = __LONG_LONG_MAX__;
     // Loop over process table looking for the process with the lowest accumulator
-    //and saves it's id in id_to_run
+    //and saves the process in p_to_run
     for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
       if(p->state == RUNNABLE) {
-        if(first){
-          id_to_run = p->pid;
+        if(p->accumulator < acc){
+          if(p_to_run)
+            release(&p_to_run->lock);
+          p_to_run = p;
           acc = p->accumulator;
-          first = 0;
-        } else{
-          if(acc > p->accumulator){
-            id_to_run = p->pid;
-            acc = p->accumulator;
-          }
-        }
-      }
-    }   
-
-    for(p = proc; p < &proc[NPROC]; p++) {
-      if(p->pid == id_to_run){
-        acquire(&p->lock);
-        if(p->state == RUNNABLE) {
-          // Switch to chosen process.  It is the process's job
-          // to release its lock and then reacquire it
-          // before jumping back to us.
-          p->state = RUNNING;
-          c->proc = p;
-          swtch(&c->context, &p->context);
-          
-          // Process is done running for now.
-          // It should have changed its p->state before coming back.
-          c->proc = 0;
+        } else {
           release(&p->lock);
         }
+      } else {
+        release(&p->lock);
       }
+    } 
+    // Switch to chosen process.  It is the process's job
+    // to update its accumulator and
+    // before jumping back to us.
+    if(p_to_run){
+      p_to_run->state = RUNNING;
+      c->proc = p_to_run;
+      swtch(&c->context, &p_to_run->context);
+      
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      release(&p_to_run->lock);
+      p_to_run = 0;
     }
   }
 }

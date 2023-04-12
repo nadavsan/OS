@@ -77,6 +77,7 @@ usertrap(void)
     exit(-1,"");
 
   // give up the CPU if this is a timer interrupt.
+  //TODO: we need to update the accumulator field (and maybe also time fields) here.
   if(which_dev == 2){
     myproc()->accumulator += myproc()->ps_priority;
     yield();
