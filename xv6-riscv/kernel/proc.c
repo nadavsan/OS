@@ -27,23 +27,66 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
-void increment_according_to_state(struct proc *my_p){
-  switch (my_p->state)
-  {
-  case RUNNING:
-    my_p->rtime += ticks - my_p->over_all_time;
-    break;
-  case SLEEPING:
-    my_p->stime += ticks - my_p->over_all_time;
-    break;
-  case RUNNABLE:
-    my_p->retime += ticks - my_p->over_all_time;
-    break;
-  default:
-    break;
+void increment_tick(void)
+{
+  struct proc* my_p;
+
+  for(my_p = proc; my_p < &proc[NPROC]; my_p++) {
+   
+    if(my_p != myproc()){
+      acquire(&my_p->lock);
+      switch (my_p->state)
+      {
+        case RUNNING:
+          my_p->rtime++;
+            break;
+        case SLEEPING:
+          my_p->stime++;
+            break;
+        case RUNNABLE:
+          my_p->retime++;
+            break;
+        default:
+            break;
+      }
+      // TODO:
+      // if(p->state == SLEEPING) {
+      //   //  if (p->pid !=0 && p->pid !=1 && p->pid !=2)
+      //   // printf("update the sleeping time  pid %d", p->pid);
+      //   p->stime++;
+      // }
+      // if(p->state == RUNNABLE){
+      //   p->retime++;  
+      //   //  if (p->pid !=0 && p->pid !=1 && p->pid !=2)
+      //   // printf("update the runnable time  pid %d\n", p->pid); 
+      // }
+      // if(p->state == RUNNING){
+      //     p->rtime++;
+      //     // if (p->pid !=0 && p->pid !=1 && p->pid !=2)
+      //     // printf("update the running time  pid %d", p->pid); 
+      // }
+      release(&my_p->lock);}
+
+    }
   }
-  my_p->over_all_time = ticks;
-}
+
+// void increment_according_to_state(struct proc *my_p){
+//   switch (my_p->state)
+//   {
+//   case RUNNING:
+//     my_p->rtime += ticks - my_p->over_all_time;
+//     break;
+//   case SLEEPING:
+//     my_p->stime += ticks - my_p->over_all_time;
+//     break;
+//   case RUNNABLE:
+//     my_p->retime += ticks - my_p->over_all_time;
+//     break;
+//   default:
+//     break;
+//   }
+//   my_p->over_all_time = ticks;
+// }
 
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
@@ -146,9 +189,12 @@ found:
   p->state = USED;
   p->ps_priority = 5;
   p->accumulator = 0;
-
   p->cfs_priority = 1;
-  p->over_all_time = 0;
+  p->rtime = 0;
+  p->stime = 0;
+  p->retime = 0;
+
+  
 
 
   // Allocate a trapframe page.
@@ -195,7 +241,7 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
-  increment_according_to_state(p);
+  // increment_according_to_state(p);
   p->state = UNUSED;
 }
 
@@ -277,13 +323,17 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  increment_according_to_state(p);
+  // increment_according_to_state(p);
   p->state = RUNNABLE;
 
   p->ps_priority = 5;
   p->accumulator = 0;
 
-  p->cfs_priority = 1;
+  // p->cfs_priority = 1;
+  // p->rtime = 0;
+  // p->stime = 0;
+  // p->retime = 0;
+  // p->over_all_time = ticks;
 
   release(&p->lock);
 }
@@ -355,11 +405,14 @@ fork(void)
   np->ps_priority = p->ps_priority;
   np->accumulator = p->accumulator;
 
-  np->over_all_time = 0;
-  np->cfs_priority = p->cfs_priority;
+  // np->over_all_time = ticks;
+  // np->cfs_priority = p->cfs_priority;
+  // np->rtime = 0;
+  // np->stime = 0;
+  // np->retime = 0;
 
   acquire(&np->lock);
-  increment_according_to_state(np);
+  // increment_according_to_state(np);
   np->state = RUNNABLE;
   release(&np->lock);
 
@@ -417,7 +470,7 @@ exit(int status, char* msg)
   acquire(&p->lock);
 
   p->xstate = status;
-  increment_according_to_state(p);
+  // increment_according_to_state(p);
   p->state = ZOMBIE;
   
     // Save the exit message
@@ -550,7 +603,7 @@ scheduler(void) //task 6 scheduler
   struct proc *min_proc = 0;
   c->proc = 0;
   uint min_vruntime;
-  uint decay_factor = 1;
+  uint decay_factor = 100;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
@@ -587,7 +640,7 @@ scheduler(void) //task 6 scheduler
     // to update its accumulator and
     // before jumping back to us.
     if (min_proc) {
-      increment_according_to_state(min_proc);
+      // increment_according_to_state(min_proc);
       min_proc->state = RUNNING;
       c->proc = min_proc;
       swtch(&c->context, &min_proc->context);
@@ -635,7 +688,7 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-  increment_according_to_state(p);
+  // increment_according_to_state(p);
   p->state = RUNNABLE;
   sched();
   release(&p->lock);
@@ -681,7 +734,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Go to sleep.
   p->chan = chan;
-  increment_according_to_state(p);
+  // increment_according_to_state(p);
   p->state = SLEEPING;
 
   sched();
@@ -705,7 +758,7 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
-        increment_according_to_state(p);
+        // increment_according_to_state(p);
         p->state = RUNNABLE;
       }
       release(&p->lock);
@@ -727,7 +780,7 @@ kill(int pid)
       p->killed = 1;
       if(p->state == SLEEPING){
         // Wake process from sleep().
-        increment_according_to_state(p);
+        // increment_according_to_state(p);
         p->state = RUNNABLE;
       }
       release(&p->lock);

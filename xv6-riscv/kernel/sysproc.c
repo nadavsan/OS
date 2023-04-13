@@ -109,13 +109,15 @@ uint64 sys_set_ps_priority(struct proc* p, int priority)
 }
 
 uint64
-sys_set_cfs_priority(int priority)
+sys_set_cfs_priority(void)
 {
+  int priority;
   argint(0, &priority);
   if (priority < 0 || priority > 2) {
     return -1;
   }
   myproc()->cfs_priority = priority;
+  // printf("priority: %d, myproc()->cfs_priority: %d\n", priority, myproc()->cfs_priority);
   return 0;
 }
 

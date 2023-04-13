@@ -29,6 +29,7 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+void increment_tick();
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -81,7 +82,7 @@ usertrap(void)
   if(which_dev == 2){
     struct proc* my_p = myproc();
     my_p->accumulator += my_p->ps_priority;
-    
+    increment_tick();
     yield();
   }
 
@@ -160,6 +161,7 @@ kerneltrap()
     //TODO: we need to update the accumulator field (and maybe also time fields) here.
     // add code to update accumulator field here
     myproc()->accumulator += myproc()->ps_priority;
+    increment_tick();
     yield();
   }
 
@@ -174,7 +176,9 @@ clockintr()
 {
   acquire(&tickslock);
   ticks++;
+  increment_tick();
   wakeup(&ticks);
+  increment_tick();
   release(&tickslock);
 }
 

@@ -11,8 +11,10 @@ int main() {
   int pid;
 //   int pids[3];
   for (int i = 0; i < 5; i++) {
-    pid = fork();
-    if (pid == 0) {
+    if ((pid = fork()) < 0) {
+        printf("Error: failed to fork\n");
+        exit(1,"");
+    } else if (pid == 0) {
       // Set the process priority based on the loop index.
       if (i == 0) {
         set_cfs_priority(HIGH_PRIO);
@@ -26,29 +28,26 @@ int main() {
       int rtime = 0, stime = 0, retime = 0, cfs_priority = 0;
       int* stats = 0;
       for (int j = 0; j < 1000000; j++) {
-        // Do some work.
-        for (int k = 0; k < 1000; k++) {
-          asm volatile("");
-        }
         // Sleep for 1 second every 100000 iterations.
         if (j % 100000 == 0) {
-          sleep(100);
+          sleep(1);
         }
         // Get process statistics.
         if (get_cfs_stats(stats) < 0) {
           printf("Error: failed to get statistics\n");
           exit(1,"");
         }
-        // Print process statistics.
-      }
+      }// Print process statistics.
       cfs_priority = stats[0];
       rtime = stats[1];
       stime = stats[2];
       retime = stats[3];
       printf("PID %d, CFS priority %d, run time %d, sleep time %d, runnable time %d\n", getpid(), cfs_priority, rtime, stime, retime);
       exit(0, "");
-    // } else if (pid > 0) {
-    //   pids[i] = pid;
+    } else if (pid > 0) {
+        wait(0,"");
+        wait(0,"");
+        wait(0,"");
     } else {
       printf("Error: failed to fork process\n");
       exit(1,"");
