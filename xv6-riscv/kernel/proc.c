@@ -151,6 +151,7 @@ allocproc(void)
   return 0;
 
 found:
+  memset(p->exit_msg, 0, sizeof(p->exit_msg));
   p->pid = allocpid();
   p->state = USED;
 
