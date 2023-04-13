@@ -332,7 +332,7 @@ fork(void)
   release(&np->lock);
 
   np->ps_priority = p->ps_priority;
-  np->accumulator = acc;
+  np->accumulator = p->accumulator;
 
   return pid;
 }
@@ -506,8 +506,8 @@ void scheduler(void)
       // It should have changed its p->state before coming back.
       c->proc = 0;
       release(&p_to_run->lock);
-      p_to_run = 0;
     }
+    p_to_run = 0;
   }
 }
 

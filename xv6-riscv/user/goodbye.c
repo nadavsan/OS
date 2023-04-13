@@ -2,6 +2,5 @@
 #include "user/user.h"
 
 int main(int argc, char *argv[]) {
-  char child_msg[]= "Goodbye World xv6";
-  exit(0, child_msg);
+  exit(0, "Goodbye World xv6");
 }
