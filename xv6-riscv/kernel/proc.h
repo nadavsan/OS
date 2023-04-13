@@ -94,11 +94,11 @@ struct proc {
   char exit_msg[32];           // Exit Message
   long long accumulator;       // Accumulator for the process
   int ps_priority;             // Process priority
-  uint32 cfs_priority;            // Process Completely Fair Scheduler Priority
-  uint32 rtime;                   // Process Running Time
-  uint32 stime;                   // Process Sleeping Time
-  uint32 retime;                  // Process Runnable Time
-  uint32 over_all_time;           // Process Over All Time
+  int cfs_priority;            // Process Completely Fair Scheduler Priority
+  int rtime;                   // Process Running Time
+  int stime;                   // Process Sleeping Time
+  int retime;                  // Process Runnable Time
+  int over_all_time;           // Process Over All Time
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
