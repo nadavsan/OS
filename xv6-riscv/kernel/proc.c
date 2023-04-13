@@ -27,6 +27,24 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+void increment_according_to_state(struct proc *my_p){
+  switch (my_p->state)
+  {
+  case RUNNING:
+    my_p->rtime += ticks - my_p->over_all_time;
+    break;
+  case SLEEPING:
+    my_p->stime += ticks - my_p->over_all_time;
+    break;
+  case RUNNABLE:
+    my_p->retime += ticks - my_p->over_all_time;
+    break;
+  default:
+    break;
+  }
+  my_p->over_all_time = ticks;
+}
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -127,7 +145,10 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->ps_priority = 5;
-  p->accumulator=0;
+  p->accumulator = 0;
+
+  p->cfs_priority = 1;
+  p->over_all_time = 0;
 
 
   // Allocate a trapframe page.
@@ -174,6 +195,7 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+  increment_according_to_state(p);
   p->state = UNUSED;
 }
 
@@ -255,10 +277,13 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
+  increment_according_to_state(p);
   p->state = RUNNABLE;
 
   p->ps_priority = 5;
   p->accumulator = 0;
+
+  p->cfs_priority = 1;
 
   release(&p->lock);
 }
@@ -327,12 +352,16 @@ fork(void)
   np->parent = p;
   release(&wait_lock);
 
-  acquire(&np->lock);
-  np->state = RUNNABLE;
-  release(&np->lock);
-
   np->ps_priority = p->ps_priority;
   np->accumulator = p->accumulator;
+
+  np->over_all_time = 0;
+  np->cfs_priority = p->cfs_priority;
+
+  acquire(&np->lock);
+  increment_according_to_state(np);
+  np->state = RUNNABLE;
+  release(&np->lock);
 
   return pid;
 }
@@ -388,6 +417,7 @@ exit(int status, char* msg)
   acquire(&p->lock);
 
   p->xstate = status;
+  increment_according_to_state(p);
   p->state = ZOMBIE;
   
     // Save the exit message
@@ -466,48 +496,109 @@ wait(uint64 addr, uint64 msg)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
-void scheduler(void)
+// void scheduler(void) //task 5 scheduler
+// {
+//   struct proc *p;
+//   struct cpu *c = mycpu();
+//   struct proc* p_to_run = 0;
+  
+//   c->proc = 0;
+//   for(;;){
+//     // Avoid deadlock by ensuring that devices can interrupt.
+//     intr_on();
+//     acc = __LONG_LONG_MAX__;
+//     // Loop over process table looking for the process with the lowest accumulator
+//     //and saves the process in p_to_run
+//     for(p = proc; p < &proc[NPROC]; p++) {
+//       acquire(&p->lock);
+//       if(p->state == RUNNABLE) {
+//         if(p->accumulator < acc){
+//           if(p_to_run)
+//             release(&p_to_run->lock);
+//           p_to_run = p;
+//           acc = p->accumulator;
+//         } else {
+//           release(&p->lock);
+//         }
+//       } else {
+//         release(&p->lock);
+//       }
+//     } 
+//     // Switch to chosen process.  It is the process's job
+//     // to update its accumulator and
+//     // before jumping back to us.
+//     if(p_to_run){
+      // increment_according_to_state(p_to_run);
+//       p_to_run->state = RUNNING;
+//       c->proc = p_to_run;
+//       swtch(&c->context, &p_to_run->context);
+      
+//       // Process is done running for now.
+//       // It should have changed its p->state before coming back.
+//       c->proc = 0;
+//       release(&p_to_run->lock);
+//     }
+//     p_to_run = 0;
+//   }
+// }
+
+void
+scheduler(void) //task 6 scheduler
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  struct proc* p_to_run = 0;
-  
+  struct proc *min_proc = 0;
   c->proc = 0;
+  uint min_vruntime;
+  uint decay_factor = 1;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    acc = __LONG_LONG_MAX__;
-    // Loop over process table looking for the process with the lowest accumulator
-    //and saves the process in p_to_run
+    min_vruntime = -1;
+    // Loop over process table looking for the process with the minimal vruntime
+    //and saves the process in min_proc and the value in min_vruntime
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        if(p->accumulator < acc){
-          if(p_to_run)
-            release(&p_to_run->lock);
-          p_to_run = p;
-          acc = p->accumulator;
-        } else {
-          release(&p->lock);
-        }
-      } else {
+      if (p->state != RUNNABLE) {
+        release(&p->lock);
+        continue;
+      }
+      // calculate vruntime for this process
+      switch (p->cfs_priority) {
+        case 0: decay_factor = 125; break;   // low priority
+        case 1: decay_factor = 100; break;   // normal priority
+        case 2: decay_factor = 75; break;    // high priority
+      }
+      uint vruntime = p->rtime * decay_factor / (p->rtime + p->stime + p->retime);
+      // select process with lowest vruntime
+      if(min_vruntime == -1){
+        min_vruntime = vruntime;
+        min_proc = p;
+      }
+      else if (vruntime < min_vruntime) {
+        release(&min_proc->lock);
+        min_vruntime = vruntime;
+        min_proc = p;
+      } else{
         release(&p->lock);
       }
-    } 
+    }
     // Switch to chosen process.  It is the process's job
     // to update its accumulator and
     // before jumping back to us.
-    if(p_to_run){
-      p_to_run->state = RUNNING;
-      c->proc = p_to_run;
-      swtch(&c->context, &p_to_run->context);
-      
+    if (min_proc) {
+      increment_according_to_state(min_proc);
+      min_proc->state = RUNNING;
+      c->proc = min_proc;
+      swtch(&c->context, &min_proc->context);
+
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
-      release(&p_to_run->lock);
+      release(&min_proc->lock);
     }
-    p_to_run = 0;
+    min_vruntime = -1;
+    min_proc = 0;
   }
 }
 
@@ -544,6 +635,7 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
+  increment_according_to_state(p);
   p->state = RUNNABLE;
   sched();
   release(&p->lock);
@@ -589,6 +681,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Go to sleep.
   p->chan = chan;
+  increment_according_to_state(p);
   p->state = SLEEPING;
 
   sched();
@@ -612,6 +705,7 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
+        increment_according_to_state(p);
         p->state = RUNNABLE;
       }
       release(&p->lock);
@@ -633,6 +727,7 @@ kill(int pid)
       p->killed = 1;
       if(p->state == SLEEPING){
         // Wake process from sleep().
+        increment_according_to_state(p);
         p->state = RUNNABLE;
       }
       release(&p->lock);
@@ -722,10 +817,6 @@ procdump(void)
   }
 }
 
-// int set_ps_priority(struct proc* p, int priority){
-//   if(priority < 1 || priority > 10){
-//     return -1;
-//   }
-//   p->ps_priority = priority;
-//   return 0;
-// }
+
+
+

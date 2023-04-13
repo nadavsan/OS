@@ -174,7 +174,6 @@ main(void)
         write(2, "wait failed\n", 12);
       } else {
         if (msg != '\0') {
-          write(1,"arifa30\n",8);
           write(1, msg,strlen(msg));
           write(1, "\n", 1);
         } else {

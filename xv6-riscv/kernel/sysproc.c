@@ -107,3 +107,30 @@ uint64 sys_set_ps_priority(struct proc* p, int priority)
   p->ps_priority = priority;
   return priority;
 }
+
+uint64
+sys_set_cfs_priority(int priority)
+{
+  argint(0, &priority);
+  if (priority < 0 || priority > 2) {
+    return -1;
+  }
+  myproc()->cfs_priority = priority;
+  return 0;
+}
+
+uint64
+sys_get_cfs_stats(void)
+{
+  uint64 stats;
+  argaddr(0, &stats);
+  int stats_ker[4];
+  struct proc* my_p = myproc();
+  stats_ker[0] = my_p->cfs_priority;
+  stats_ker[1] = my_p->rtime;
+  stats_ker[2] = my_p->stime;
+  stats_ker[3] = my_p->retime;
+  if(stats_ker != 0 && copyout(my_p->pagetable,stats,(char *)&stats_ker,sizeof(stats_ker)) == 0)
+    return 0;
+  return -1;
+}
