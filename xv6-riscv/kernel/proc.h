@@ -99,7 +99,6 @@ struct proc {
   int rtime;                   // Process Running Time
   int stime;                   // Process Sleeping Time
   int retime;                  // Process Runnable Time
-  // int sched_policy;            // Process Scheduling Policy
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

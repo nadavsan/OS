@@ -109,11 +109,6 @@ void            procdump(void);
 void            increment_tick(void);
 int             get_cfs_stats(int, int*);
 void            set_cfs_priority(int);
-int             set_policy(int);
-void            cfs_scheduler(void);
-void            accumulator_scheduler(void);
-void            original_scheduler(void);
-
 
 
 // swtch.S

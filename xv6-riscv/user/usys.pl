@@ -40,4 +40,3 @@ entry("memsize");
 entry("set_ps_priority");
 entry("set_cfs_priority");
 entry("get_cfs_stats");
-entry("set_policy");
