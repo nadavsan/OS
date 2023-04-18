@@ -117,7 +117,7 @@ sys_set_cfs_priority(void)
     return -1;
   }
   set_cfs_priority(priority);
-  printf("priority: %d, myproc()->cfs_priority: %d\n", priority, myproc()->cfs_priority);
+  // printf("priority: %d, myproc()->cfs_priority: %d\n", priority, myproc()->cfs_priority);
   return 0;
 }
 

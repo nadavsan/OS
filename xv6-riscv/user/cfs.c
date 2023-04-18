@@ -16,7 +16,7 @@ void print_cfs_stats(int pid) {
 int main(){
 
 int child_pid[3];
-    for (int i = 0; i < 3; i++) {
+    for (int i = 2; i >= 0; i--) {
         int pid = fork();
         
         if (pid == -1) {
@@ -26,9 +26,9 @@ int child_pid[3];
         { //child proc
             set_cfs_priority(i);
             
-            for (int i=0;i<100000000;i++)
+            for (int j=0;j<1000000;j++)
             {
-                if (i%100000==0)
+                if (j%100000==0)
                 {
                     sleep(1);
                 }
