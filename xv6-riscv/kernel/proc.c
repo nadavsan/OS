@@ -15,6 +15,7 @@ struct proc *initproc;
 int nextpid = 1;
 struct spinlock pid_lock;
 long long acc;
+int sched_policy = -1;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
@@ -93,6 +94,11 @@ void set_cfs_priority (int prior){
   release(&my_p->lock);
 }
 
+//new code: 
+int set_policy(int policy){
+  sched_policy = policy;
+  return 0;
+}
 
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
@@ -520,6 +526,26 @@ wait(uint64 addr, uint64 msg)
   }
 }
 
+void
+scheduler(void){
+  for(;;){
+    switch (sched_policy) {
+    case 0:
+      original_scheduler();
+      break;
+    case 1:
+      accumulator_scheduler();
+      break;
+    case 2:
+      cfs_scheduler();
+      break;
+    default:
+      exit(1, "Scheduling policy was not set");
+      break;
+    }
+  }
+}
+
 
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -528,54 +554,87 @@ wait(uint64 addr, uint64 msg)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
-
-// void scheduler(void) //task 5 scheduler
-// {
-//   struct proc *p;
-//   struct cpu *c = mycpu();
-//   struct proc* p_to_run = 0;
+void
+original_scheduler(void)
+{
+  struct proc *p;
+  struct cpu *c = mycpu();
   
-//   c->proc = 0;
-//   for(;;){
-//     // Avoid deadlock by ensuring that devices can interrupt.
-//     intr_on();
-//     acc = __LONG_LONG_MAX__;
-//     // Loop over process table looking for the process with the lowest accumulator
-//     //and saves the process in p_to_run
-//     for(p = proc; p < &proc[NPROC]; p++) {
-//       acquire(&p->lock);
-//       if(p->state == RUNNABLE) {
-//         if(p->accumulator < acc){
-//           if(p_to_run)
-//             release(&p_to_run->lock);
-//           p_to_run = p;
-//           acc = p->accumulator;
-//         } else {
-//           release(&p->lock);
-//         }
-//       } else {
-//         release(&p->lock);
-//       }
-//     } 
-//     // Switch to chosen process.  It is the process's job
-//     // to update its accumulator and
-//     // before jumping back to us.
-//     if(p_to_run){
-//       p_to_run->state = RUNNING;
-//       c->proc = p_to_run;
-//       swtch(&c->context, &p_to_run->context);
-      
-//       // Process is done running for now.
-//       // It should have changed its p->state before coming back.
-//       c->proc = 0;
-//       release(&p_to_run->lock);
-//     }
-//     p_to_run = 0;
-//   }
-// }
+  c->proc = 0;
+  for(;;){
+    if(sched_policy != 0) {
+      break;
+    }
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+      release(&p->lock);
+    }
+  }
+}
 
 void
-scheduler(void) //task 6 scheduler
+accumulator_scheduler(void) //task 5 scheduler
+{
+  struct proc *p;
+  struct cpu *c = mycpu();
+  struct proc* p_to_run = 0;
+  
+  c->proc = 0;
+  for(;;){
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+    acc = __LONG_LONG_MAX__;
+    // Loop over process table looking for the process with the lowest accumulator
+    //and saves the process in p_to_run
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
+        if(p->accumulator < acc){
+          if(p_to_run)
+            release(&p_to_run->lock);
+          p_to_run = p;
+          acc = p->accumulator;
+        } else {
+          release(&p->lock);
+        }
+      } else {
+        release(&p->lock);
+      }
+    } 
+    // Switch to chosen process.  It is the process's job
+    // to update its accumulator and
+    // before jumping back to us.
+    if(p_to_run){
+      p_to_run->state = RUNNING;
+      c->proc = p_to_run;
+      swtch(&c->context, &p_to_run->context);
+      
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      release(&p_to_run->lock);
+    }
+    p_to_run = 0;
+  }
+}
+
+void
+cfs_scheduler(void) //task 6 scheduler
 {
   struct proc *p;
   struct cpu *c = mycpu();

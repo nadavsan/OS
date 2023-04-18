@@ -121,17 +121,15 @@ sys_set_cfs_priority(void)
   return 0;
 }
 
-//TODO 1
-// uint64
-// sys_get_cfs_stats(void){
-//   int* arr;
-//   uint64 addr;
-//   argaddr(1, &addr);
-//   arr = (int*)addr;
-//   get_cfs_stats(arr);
-//   copyout(my_p->pagetable,(uint64)stats,(char *)&stats_ker,4*sizeof(int))
-//   return 0;
-// }
+uint64
+sys_set_policy(void){
+  int policy;
+  argint(0, &policy);
+  if (policy < 0 || policy > 2) {
+    return -1;
+  }
+  return set_policy(policy);
+}
 
 //TODO 1
 uint64
