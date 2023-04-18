@@ -117,6 +117,7 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 
 UPROGS=\
 	$U/_cfs\
+	$U/_get_cfs_stats\
 	$U/_memsize_test\
 	$U/_cat\
 	$U/_goodbye\

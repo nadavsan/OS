@@ -116,11 +116,12 @@ sys_set_cfs_priority(void)
   if (priority < 0 || priority > 2) {
     return -1;
   }
-  myproc()->cfs_priority = priority;
-  // printf("priority: %d, myproc()->cfs_priority: %d\n", priority, myproc()->cfs_priority);
+  set_cfs_priority(priority);
+  printf("priority: %d, myproc()->cfs_priority: %d\n", priority, myproc()->cfs_priority);
   return 0;
 }
 
+//TODO 1
 // uint64
 // sys_get_cfs_stats(void){
 //   int* arr;
@@ -132,22 +133,15 @@ sys_set_cfs_priority(void)
 //   return 0;
 // }
 
+//TODO 1
 uint64
-sys_get_cfs_stats(void)
-{
+sys_get_cfs_stats(void){
+  int pid;
   int* arr;
-  uint64 stats;
-  argaddr(0, &stats);
-  arr = (int*)stats;
-  int stats_ker[4];
-  struct proc* my_p = myproc();
-  stats_ker[0] = my_p->cfs_priority;
-  stats_ker[1] = my_p->rtime;
-  stats_ker[2] = my_p->stime;
-  stats_ker[3] = my_p->retime;
-  printf("stats_ker[0]: %d, stats_ker[1]: %d, stats_ker[2]: %d, stats_ker[3]: %d\n", stats_ker[0], stats_ker[1], stats_ker[2], stats_ker[3]);
-  if(stats_ker != 0 && copyout(my_p->pagetable,(uint64)arr,(char *)&stats_ker,4*sizeof(int)) == 0)
-  // copyout(my_p->pagetable,(uint64)arr,(char *)&stats_ker,4*sizeof(int));
-    return 0;
-  return -1;
+  uint64 addr;
+  argint(0, &pid);
+  argaddr(1, &addr);
+  arr = (int*)addr;
+  get_cfs_stats(pid, arr);
+  return 0;
 }

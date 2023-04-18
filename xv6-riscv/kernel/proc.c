@@ -27,6 +27,7 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+//new code:
 void increment_tick(void)
 {
   struct proc* my_p;
@@ -53,6 +54,47 @@ void increment_tick(void)
 
     }
   }
+
+//new code:
+//TODO 1
+struct proc* get_proc_from_id(int pid){
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->pid == pid){
+      return p;
+    }
+  }
+  return 0;
+}
+
+//new code:
+//TODO 1
+int get_cfs_stats(int pid, int* arr){
+  int array[4];
+  struct proc *p = get_proc_from_id(pid);
+  //acquire(&p->lock);
+  array[0] = p->cfs_priority;
+  array[1] = p->rtime;
+  array[2] = p->stime;
+  array[3] = p->retime;
+  if (copyout(myproc()->pagetable, (uint64)arr, (char*)&array, 4*sizeof(int)) < 0) {
+    kfree(arr);
+    return -1;
+  }
+  printf("proc id: %d, proc cfs priority: %d, proc cfs rtime: %d, proc cfs stime: %d, proc cfs retime: %d\n",pid , array[0], array[1], array[2], array[3]);
+  //release(&p->lock);
+  return 0;
+}
+
+
+//new code:
+//TODO 1
+void set_cfs_priority (int priority){
+  struct proc* my_p = myproc(); 
+  acquire(&my_p->lock);
+  my_p->cfs_priority = priority; 
+  release(&my_p->lock);
+}
 
 
 // Allocate a page for each process's kernel stack.
@@ -414,13 +456,10 @@ exit(int status, char* msg)
   acquire(&p->lock);
 
   p->xstate = status;
+  // Save the exit message
+  safestrcpy(p->exit_msg, msg, 32);
   p->state = ZOMBIE;
   
-    // Save the exit message
-  if (msg != 0 && argstr(0, msg, MAXARG) >= 0) {
-    safestrcpy(p->exit_msg, msg, 32);
-  }
-
   release(&wait_lock);
 
   // Jump into the scheduler, never to return.
@@ -545,12 +584,13 @@ scheduler(void) //task 6 scheduler
   struct cpu *c = mycpu();
   struct proc *min_proc = 0;
   c->proc = 0;
-  uint min_vruntime;
+  uint min_vruntime = -1;
   uint decay_factor = 100;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    min_vruntime = -1;
+
+    // min_vruntime = -1;
     // Loop over process table looking for the process with the minimal vruntime
     //and saves the process in min_proc and the value in min_vruntime
     for(p = proc; p < &proc[NPROC]; p++) {

@@ -2,66 +2,49 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-void main(){
-    int p[3];
-    int pid1, pid2, pid3;
-
-    if ((pid1 = fork()) < 0){
-        printf("Error: failed to fork\n");
-        exit(1,"");
-    }else if (pid1 == 0){
-        set_cfs_priority(0);
-        for (int i=0;i<10000000;i++){
-            if(i%100000==0){
-                sleep(1);
-            }
-        }
-        if(get_cfs_stats(p) < 0){
-            printf("Error: failed to get statistics\n");
-            exit(1,"");
+void print_cfs_stats(int pid) {
+    for (int i=0;i<1000000;i++){
+        if (i%100000==0){
+            sleep(1);
         }
     }
-    else{
-        printf("pid %d priority %d runnable time %d , run time %d, sleep time:%d\n",pid1,p[0],p[1],p[2], p[3]);
-        if ((pid2=fork()) < 0){
-            printf("Error: failed to fork\n");
-            exit(1,"");
-        }else if (pid2 == 0){
-            set_cfs_priority(1);
-            for (int i=0;i<10000000;i++){
-                if(i%100000==0){
-                sleep(1);
-            }
-        }
-        if(get_cfs_stats(p) < 0){
-            printf("Error: failed to get statistics\n");
-            exit(1,"");
-        }
-    } else{
-        printf("pid %d priority %d runnable time %d , run time %d, sleep time:%d\n",pid2,p[0],p[1],p[2], p[3]);
-        if((pid3=fork()) < 0){
-            printf("Error: failed to fork\n");
-            exit(1,"");
-        }else if (pid3==0){
-            set_cfs_priority(2);
-            for (int i=0;i<10000000;i++){
-                if(i%100000==0){
-                sleep(1);
+    int arr[4];
+    get_cfs_stats(pid,arr);
 
-            }
-        }
-        if(get_cfs_stats(p) < 0){
-            printf("Error: failed to get statistics\n");
-            exit(1,"");
-        }
-        } else{
-            printf("pid %d priority %d runnable time %d , run time %d, sleep time:%d\n",pid3,p[0],p[1],p[2], p[3]);            
-            wait(0,0);   
-            wait(0,0); 
-            wait(0,0);     
-        }
-        exit(0,"");
+}
 
-     }
+int main(){
+
+int child_pid[3];
+    for (int i = 0; i < 3; i++) {
+        int pid = fork();
+        
+        if (pid == -1) {
+            exit(1, "");
+
+        } else if (pid == 0) 
+        { //child proc
+            set_cfs_priority(i);
+            
+            for (int i=0;i<100000000;i++)
+            {
+                if (i%100000==0)
+                {
+                    sleep(1);
+                }
+            }
+            int arr[4];
+            get_cfs_stats(getpid(),arr);
+
+            exit(0, "");
+        }
+        else{
+            child_pid[i] = pid;
+        }
     }
+    for (int i = 0; i < 3; i++) {
+        wait(&child_pid[i], 0);
+    }
+    return 0;
+
 }
