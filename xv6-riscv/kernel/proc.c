@@ -55,44 +55,41 @@ void increment_tick(void)
     }
   }
 
-//new code:
-//TODO 1
-struct proc* get_proc_from_id(int pid){
-  struct proc *p;
-  for(p = proc; p < &proc[NPROC]; p++){
-    if(p->pid == pid){
-      return p;
-    }
-  }
-  return 0;
-}
+
 
 //new code:
-//TODO 1
 int get_cfs_stats(int pid, int* arr){
   int array[4];
-  struct proc *p = get_proc_from_id(pid);
-  //acquire(&p->lock);
+  struct proc *p;
+  int found = 0;
+  for(p = proc; p < &proc[NPROC] && !(found); p++){
+    if(p->pid == pid){
+      found = 1;
+      break;
+    }
+  }
+  if (!found)
+    return -1;
+
   array[0] = p->cfs_priority;
   array[1] = p->rtime;
   array[2] = p->stime;
-  array[3] = p->retime;
+  array[3] = p->retime;    
+  
   if (copyout(myproc()->pagetable, (uint64)arr, (char*)&array, 4*sizeof(int)) < 0) {
-    kfree(arr);
+    // kfree(arr);
     return -1;
   }
   printf("proc id: %d, proc cfs priority: %d, proc cfs rtime: %d, proc cfs stime: %d, proc cfs retime: %d\n",pid , array[0], array[1], array[2], array[3]);
-  //release(&p->lock);
   return 0;
 }
 
 
 //new code:
-//TODO 1
-void set_cfs_priority (int priority){
+void set_cfs_priority (int prior){
   struct proc* my_p = myproc(); 
   acquire(&my_p->lock);
-  my_p->cfs_priority = priority; 
+  my_p->cfs_priority = prior; 
   release(&my_p->lock);
 }
 

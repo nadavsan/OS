@@ -2,20 +2,9 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-void print_cfs_stats(int pid) {
-    for (int i=0;i<1000000;i++){
-        if (i%100000==0){
-            sleep(1);
-        }
-    }
-    int arr[4];
-    get_cfs_stats(pid,arr);
-
-}
 
 int main(){
-
-int child_pid[3];
+    int child_pid[3];
     for (int i = 2; i >= 0; i--) {
         int pid = fork();
         
@@ -34,7 +23,9 @@ int child_pid[3];
                 }
             }
             int arr[4];
-            get_cfs_stats(getpid(),arr);
+            if(get_cfs_stats(getpid(),arr) < 0){
+                exit(1, "get_cfs_stats failed");
+            }
 
             exit(0, "");
         }
