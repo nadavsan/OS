@@ -536,11 +536,8 @@ scheduler(void){
     case 1:
       accumulator_scheduler();
       break;
-    case 2:
-      cfs_scheduler();
-      break;
     default:
-      exit(1, "Scheduling policy was not set");
+      cfs_scheduler();
       break;
     }
   }
@@ -562,7 +559,7 @@ original_scheduler(void)
   
   c->proc = 0;
   for(;;){
-    if(sched_policy != 0) {
+    if(sched_policy == 2 || sched_policy == 1) {
       break;
     }
     // Avoid deadlock by ensuring that devices can interrupt.
@@ -596,6 +593,9 @@ accumulator_scheduler(void) //task 5 scheduler
   
   c->proc = 0;
   for(;;){
+    if(sched_policy == 2 || sched_policy == 0) {
+      break;
+    }
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
     acc = __LONG_LONG_MAX__;
@@ -640,9 +640,12 @@ cfs_scheduler(void) //task 6 scheduler
   struct cpu *c = mycpu();
   struct proc *min_proc = 0;
   c->proc = 0;
-  uint min_vruntime = -1;
+  int min_vruntime = -1;
   uint decay_factor = 100;
   for(;;){
+    if(sched_policy == 0 || sched_policy == 1) {
+      break;
+    }
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
