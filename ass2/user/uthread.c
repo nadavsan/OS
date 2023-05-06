@@ -5,7 +5,7 @@
 struct uthread uthreads[MAX_UTHREADS];
 
 // Current running user thread index
-int current_thread = 0;
+int current_thread_i = 0;
 
 // Number of currently active user threads
 int num_threads = 0;
@@ -13,8 +13,13 @@ int num_threads = 0;
 // Main user thread context
 struct context main_context;
 
-// Flag indicating whether user threads have been started
-int threads_started = 0;
+// Global variable to make sure uthread_start_all() is called only once
+int started = 0;
+
+//global variables for uthread_start_all:
+static struct uthread *current_thread;
+static struct uthread main_thread;
+static struct context main_context;
 
 // Initialize user thread table
 void uthread_init() {
@@ -37,33 +42,33 @@ int find_free_thread() {
 
 // Set the context of the current thread
 void set_current_thread_context(struct context* context) {
-    uthreads[current_thread].context = *context;
+    uthreads[current_thread_i].context = *context;
 }
 
 // Get the context of the current thread
 void get_current_thread_context(struct context* context) {
-    *context = uthreads[current_thread].context;
+    *context = uthreads[current_thread_i].context;
 }
 
 // Switch to the next runnable thread
 void switch_thread() {
     // Save current thread's context
-    struct context* current_context = &uthreads[current_thread].context;
+    struct context* current_context = &uthreads[current_thread_i].context;
     get_current_thread_context(current_context);
 
     // Find the next runnable thread
     int i;
     for (i = 0; i < MAX_UTHREADS; i++) {
-        current_thread = (current_thread + sizeof(uthreads[i]));
-        if (uthreads[current_thread].state == RUNNABLE && uthreads[current_thread].priority == HIGH) {
+        current_thread_i = (current_thread_i + sizeof(uthreads[i]));
+        if (uthreads[current_thread_i].state == RUNNABLE && uthreads[current_thread_i].priority == HIGH) {
             break;
         }
     }
 
     if(i == MAX_UTHREADS){
         for (i = 0; i < MAX_UTHREADS; i++) {
-            current_thread = (current_thread + sizeof(uthreads[i]));
-            if (uthreads[current_thread].state == RUNNABLE && uthreads[current_thread].priority == MEDIUM) {
+            current_thread_i = (current_thread_i + sizeof(uthreads[i]));
+            if (uthreads[current_thread_i].state == RUNNABLE && uthreads[current_thread_i].priority == MEDIUM) {
                 break;
             }
         }
@@ -72,8 +77,8 @@ void switch_thread() {
 
     if(i == MAX_UTHREADS){
         for (i = 0; i < MAX_UTHREADS; i++) {
-            current_thread = (current_thread + sizeof(uthreads[i]));
-            if (uthreads[current_thread].state == RUNNABLE && uthreads[current_thread].priority == LOW) {
+            current_thread_i = (current_thread_i + sizeof(uthreads[i]));
+            if (uthreads[current_thread_i].state == RUNNABLE && uthreads[current_thread_i].priority == LOW) {
                 break;
             }
         }
@@ -83,9 +88,10 @@ void switch_thread() {
         exit(1);
     
 
-
+    // Set current thread to next thread
+    current_thread = &uthreads[current_thread_i];
     // Restore next thread's context
-    struct context* next_context = &uthreads[current_thread].context;
+    struct context* next_context = &uthreads[current_thread_i].context;
     set_current_context(next_context);
     uswtch(current_context, next_context);
 }
@@ -131,7 +137,7 @@ void uthread_exit() {
     }
     switch_thread();
     // Set the current thread's state to FREE
-    uthreads[current_thread].state = FREE;
+    uthreads[current_thread_i].state = FREE;
     return 0;
 }
 
@@ -147,29 +153,47 @@ enum sched_priority uthread_get_priority() {
     return self->priority;
 }
 
-int uthread_start_all() {
-    if (threads_started) {
-        return -1;  // uthread_start_all can only be called once
-    }
-    threads_started = 1;
 
-    struct uthread* next_thread = 0;
-    int i;
-    for (i = 0; i < MAX_UTHREADS; i++) {
-        if (uthreads[i].state == RUNNABLE) {
-            next_thread = &uthreads[i];
-            break;
+
+int uthread_start_all() {
+    // make sure that main thread is created
+    if (main_thread.state == FREE) {
+        if (uthread_create(0, LOW) == -1) {
+            return -1;
         }
     }
 
-    if (next_thread == 0) {
-        return -1;  // no runnable threads found
+    // make sure uthread_start_all() is not called more than once
+    if (started) {
+        return -1;
+    }
+    started = 1;
+
+    // set current thread to main thread
+    current_thread = &main_thread;
+    current_thread->state = RUNNING;
+
+    //TODO: check if we need to save main context and how to do it
+    // save main context and switch to first thread
+    // if (getcontext(&main_context) == -1) {
+    //     perror("getcontext");
+    //     exit(1);
+    // }
+
+    //TODO: check if that's the way to run the first thread (index 0)
+    struct uthread *next_thread = &uthreads[0];
+    if (next_thread != 0) {
+        current_thread = next_thread;
+        current_thread->state = RUNNING;
+        uswtch(&main_context, &(current_thread->context));
     }
 
-    // set current thread to RUNNING and switch to next_thread
-    current_thread = next_thread;
-    uthreads[i].state = RUNNING;
-    uswtch(&main_thread->context, &uthreads[i].context);
-    
-    return 0;  // never reached
+    // We should never reach this point, but just in case...
+    return -1;
 }
+
+
+struct uthread_t* uthread_self() {
+    return current_thread;
+}
+
