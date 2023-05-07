@@ -1,4 +1,5 @@
-#include "types.h"
+#include "kernel/types.h"
+#include "user.h"
 #include "uthread.h"
 
 // User thread table
@@ -19,7 +20,6 @@ int started = 0;
 //global variables for uthread_start_all:
 static struct uthread *current_thread;
 static struct uthread main_thread;
-static struct context main_context;
 
 // Initialize user thread table
 void uthread_init() {
@@ -92,7 +92,7 @@ void switch_thread() {
     current_thread = &uthreads[current_thread_i];
     // Restore next thread's context
     struct context* next_context = &uthreads[current_thread_i].context;
-    set_current_context(next_context);
+    set_current_thread_context(next_context);
     uswtch(current_context, next_context);
 }
 
@@ -138,7 +138,7 @@ void uthread_exit() {
     switch_thread();
     // Set the current thread's state to FREE
     uthreads[current_thread_i].state = FREE;
-    return 0;
+    return;
 }
 
 enum sched_priority uthread_set_priority(enum sched_priority priority) {
@@ -193,7 +193,7 @@ int uthread_start_all() {
 }
 
 
-struct uthread_t* uthread_self() {
+struct uthread* uthread_self() {
     return current_thread;
 }
 
