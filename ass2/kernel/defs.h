@@ -110,6 +110,10 @@ void            procdump(void);
 // kthread.c
 void                kthreadinit(struct proc *);
 struct kthread*     mykthread();
+int                 allocktid(struct proc *);
+void                freekt(struct kthread *);
+struct kthread*     allockt(struct proc *);
+void                clearContext(struct kthread *);
 
 // TODO: delte this after you are done with task 2.2
 void allocproc_help_function(struct proc *p);
