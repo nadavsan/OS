@@ -34,8 +34,7 @@ struct kthread *mykthread()
   struct cpu *c=mycpu();
   struct kthread *kt=c->kthread;
   pop_off();
-  //TODO: should we just return kt?
-  return &myproc()->kthread[0];
+  return kt;
 }
 
 int allocktid(struct proc *p){
@@ -43,7 +42,7 @@ int allocktid(struct proc *p){
   int ktid;
   acquire(&p->tid_lock);
   ktid=p->thread_count;
-  p->thread_count=p->thread_count+1;
+  p->thread_count+=1;
   release(&p->tid_lock);
   return ktid;
 
@@ -65,13 +64,6 @@ struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
   return p->base_trapframes + ((int)(kt - p->kthread));
 }
 
-// TODO: delte this after you are done with task 2.2
-void allocproc_help_function(struct proc *p)
-{
-  p->kthread->trapframe = get_kthread_trapframe(p, p->kthread);
-
-  p->context.sp = p->kthread->kstack + PGSIZE;
-}
 
 struct kthread *allockt(struct proc *p)
 {
@@ -80,10 +72,10 @@ struct kthread *allockt(struct proc *p)
   for (kt=p->kthread; kt<&p->kthread[NKT];kt++)
   {
     acquire(&kt->lock);
-    if(kt->state==UNUSED)
+    if(kt->state==TUNUSED)
     {
       kt->tid==allocktid(p);
-      kt->state=USED;
+      kt->state=TUSED;
       kt->trapframe=get_kthread_trapframe(p, kt);
       break;
     }

@@ -86,8 +86,10 @@ myproc(void)
 {
   push_off();
   struct cpu *c = mycpu();
-  struct proc *p = c->proc;
-  pop_off();
+  struct proc *p = 0;
+  if (c->kthread)
+    p = c->kthread->p;
+  pop_off(); //TODO: might need to delete this.
   return p;
 }
 
@@ -127,6 +129,11 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+  acquire(&p->tid_lock);
+  p->thread_count = 1;
+  release(&p->tid_lock);
+
+  
   // Allocate a trapframe page.
   if((p->base_trapframes = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -145,13 +152,16 @@ found:
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
-  memset(&p->context, 0, sizeof(p->context));
-  p->context.ra = (uint64)forkret;
-  p->context.sp = p->kstack + PGSIZE;
+  // memset(&p->context, 0, sizeof(p->context));
+  // p->context.ra = (uint64)forkret;
+  // p->context.sp = p->kstack + PGSIZE;
 
+
+  //allocating first thread
+  allockt(p);
 
   // TODO: delte this after you are done with task 2.2
-  allocproc_help_function(p);
+  // allocproc_help_function(p);
   return p;
 }
 
@@ -161,6 +171,9 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  for(struct kthread *t = p->kthread; t < &p->kthread[NKT]; t++)
+    freekt(t);
+
   if(p->base_trapframes)
     kfree((void*)p->base_trapframes);
   p->base_trapframes = 0;
@@ -171,7 +184,6 @@ freeproc(struct proc *p)
   p->pid = 0;
   p->parent = 0;
   p->name[0] = 0;
-  p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
@@ -453,8 +465,9 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  struct kthread *t;
   
-  c->proc = 0;
+  c->kthread = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
@@ -465,13 +478,13 @@ scheduler(void)
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+        t->state = TRUNNING;
+        c->kthread = t;
+        swtch(&c->context, &t->context);
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-        c->proc = 0;
+        c->kthread = 0;
       }
       release(&p->lock);
     }
@@ -489,19 +502,19 @@ void
 sched(void)
 {
   int intena;
-  struct proc *p = myproc();
+  struct kthread *t = mykthread();
 
-  if(!holding(&p->lock))
+  if(!holding(&t->lock))
     panic("sched p->lock");
   if(mycpu()->noff != 1)
     panic("sched locks");
-  if(p->state == RUNNING)
+  if(t->state == TRUNNING)
     panic("sched running");
   if(intr_get())
     panic("sched interruptible");
 
   intena = mycpu()->intena;
-  swtch(&p->context, &mycpu()->context);
+  swtch(&t->context, &mycpu()->context);
   mycpu()->intena = intena;
 }
 
@@ -542,7 +555,7 @@ forkret(void)
 void
 sleep(void *chan, struct spinlock *lk)
 {
-  struct proc *p = myproc();
+  struct kthread *t = mykthread();
   
   // Must acquire p->lock in order to
   // change p->state and then call sched.
@@ -551,20 +564,20 @@ sleep(void *chan, struct spinlock *lk)
   // (wakeup locks p->lock),
   // so it's okay to release lk.
 
-  acquire(&p->lock);  //DOC: sleeplock1
+  acquire(&t->lock);  //DOC: sleeplock1
   release(lk);
 
   // Go to sleep.
-  p->chan = chan;
-  p->state = SLEEPING;
+  t->chan = chan;
+  t->state = TSLEEPING;
 
   sched();
 
   // Tidy up.
-  p->chan = 0;
+  t->chan = 0;
 
   // Reacquire original lock.
-  release(&p->lock);
+  release(&t->lock);
   acquire(lk);
 }
 
@@ -574,14 +587,15 @@ void
 wakeup(void *chan)
 {
   struct proc *p;
+  struct kthread *t;
 
   for(p = proc; p < &proc[NPROC]; p++) {
-    if(p != myproc()){
-      acquire(&p->lock);
-      if(p->state == SLEEPING && p->chan == chan) {
-        p->state = RUNNABLE;
+    for(t = p->kthread; t < &p->kthread[NKT]; t++) {
+      acquire(&t->lock);
+      if(t->state == TSLEEPING && t->chan == chan) {
+        t->state = TRUNNABLE;
       }
-      release(&p->lock);
+      release(&t->lock);
     }
   }
 }

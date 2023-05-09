@@ -81,7 +81,7 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 
 
-enum threadstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum threadstate { TUNUSED, TUSED, TSLEEPING, TRUNNABLE, TRUNNING, TZOMBIE };
 
 struct context context;     // swtch() here to enter scheduler().
 
