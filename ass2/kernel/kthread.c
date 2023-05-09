@@ -51,7 +51,7 @@ int allocktid(struct proc *p){
 void freekt(struct kthread *kt)
 {
   kt->chan=0;
-  kt->state=UNUSED;
+  kt->state=TUNUSED;
   kt->killed=0;
   kt->tid=0;
   kt->xstate=0;
@@ -88,15 +88,11 @@ struct kthread *allockt(struct proc *p)
   if(kt<&p->kthread[NKT])
   {
     clearContext(kt);
-    //TODO: why is forkret not included ?
-    kt->context.ra=(uint64)forkret;
+    kt->context.ra=(uint64)forkret();
     kt->context.sp=kt->kstack+PGSIZE;
     return kt;
   }
-  else
-  {
-    return 0;
-  }
+  return 0;
 
 }
 
@@ -104,3 +100,5 @@ void clearContext(struct kthread *kt)
 {
   memset(&kt->context, 0, sizeof(kt->context));
 }
+
+

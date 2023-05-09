@@ -267,8 +267,8 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->state = RUNNABLE;
-
+  p->kthread[0].state = RUNNABLE;
+  release(&p->kthread->lock);
   release(&p->lock);
 }
 
@@ -310,7 +310,9 @@ fork(void)
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
+    //TODO: might need to release in the opposite order
     release(&np->lock);
+    release(&np->kthread->lock);
     return -1;
   }
   np->sz = p->sz;
@@ -330,7 +332,10 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
+  np->kthread[0].chan = kt->chan;
+  np->kthread[0].p = np;
 
+  release(&np->kthread->lock);
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -338,8 +343,12 @@ fork(void)
   release(&wait_lock);
 
   acquire(&np->lock);
-  np->state = RUNNABLE;
+  np->state = USED;
   release(&np->lock);
+
+  acquire(&np->kthread[0].lock);
+  np->kthread[0].state = TRUNNABLE;
+  release(&np->kthread[0].lock);
 
   return pid;
 }
@@ -365,6 +374,7 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
+  struct kthread *t;
   struct proc *p = myproc();
 
   if(p == initproc)
