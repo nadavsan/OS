@@ -115,6 +115,12 @@ int                 allocktid(struct proc *);
 void                freekt(struct kthread *);
 struct kthread*     allockt(struct proc *);
 void                clearContext(struct kthread *);
+int                 kthread_create( void *(*start_func)(), void *stack, uint stack_size);
+int                 kthread_id(void);
+int                 kthread_kill(int);
+void                kthread_exit(int);
+int                 kthread_join(int, uint64);
+struct trapframe*   get_kthread_trapframe(struct proc *, struct kthread *);
 
 
 // swtch.S

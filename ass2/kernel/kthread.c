@@ -101,4 +101,23 @@ void clearContext(struct kthread *kt)
   memset(&kt->context, 0, sizeof(kt->context));
 }
 
+int kthread_create( void *(*start_func)(), void *stack, uint stack_size){
+  struct proc *p = myproc();
+  int tid;
+  struct kthread *createt;
+  
+  createt = allockthread(p);
+  // Allocate kthread
+  if(createt  == 0){
+    return -1;
+  }
+ 
+  createt->trapframe->epc = (uint64)start_func;
+  createt->trapframe->sp = (uint64)stack + stack_size;
+  tid = createt->tid;
+  createt->state = RUNNABLE;
+  release(&createt->lock);
+  return tid;
 
+
+}
