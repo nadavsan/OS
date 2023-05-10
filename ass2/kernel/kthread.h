@@ -83,7 +83,7 @@ extern struct cpu cpus[NCPU];
 
 enum threadstate { TUNUSED, TUSED, TSLEEPING, TRUNNABLE, TRUNNING, TZOMBIE };
 
-struct context context;     // swtch() here to enter scheduler().
+//struct context context;     // swtch() here to enter scheduler().
 
 
 struct kthread

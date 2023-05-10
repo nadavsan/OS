@@ -74,7 +74,7 @@ struct kthread *allockt(struct proc *p)
     acquire(&kt->lock);
     if(kt->state==TUNUSED)
     {
-      kt->tid==allocktid(p);
+      kt->tid=allocktid(p);
       kt->state=TUSED;
       kt->trapframe=get_kthread_trapframe(p, kt);
       break;
@@ -88,7 +88,7 @@ struct kthread *allockt(struct proc *p)
   if(kt<&p->kthread[NKT])
   {
     clearContext(kt);
-    kt->context.ra=(uint64)forkret();
+    kt->context.ra=(uint64)forkret;
     kt->context.sp=kt->kstack+PGSIZE;
     return kt;
   }

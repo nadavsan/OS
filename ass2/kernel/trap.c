@@ -55,6 +55,7 @@ usertrap(void)
 
     if(killed(p))
       exit(-1);
+    
 
     // sepc points to the ecall instruction,
     // but we want to return to the next instruction.
@@ -75,6 +76,8 @@ usertrap(void)
 
   if(killed(p))
     exit(-1);
+
+    
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
@@ -152,7 +155,10 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  //before giving up the CPU by calling yield(…), the testing 
+  //condition should reference the desired kthread and 
+  //its state (as opposed to a proc).
+  if(myproc()->kthread->state == TRUNNING && myproc()->kthread != 0 && which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield();
 
   // the yield() may have caused some traps to occur,
