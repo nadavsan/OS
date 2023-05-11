@@ -46,9 +46,9 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
-  struct kthread *kt = mykthread();
+  struct kthread *t = mykthread();
   // save user program counter.
-  kt->trapframe->epc = r_sepc();
+  t->trapframe->epc = r_sepc();
   
   if(r_scause() == 8){
     // system call
@@ -56,10 +56,14 @@ usertrap(void)
     if(killed(p))
       exit(-1);
     
+    if(t->killed)
+    {
+      kthread_exit(-1);
+    }
 
     // sepc points to the ecall instruction,
     // but we want to return to the next instruction.
-    kt->trapframe->epc += 4;
+    t->trapframe->epc += 4;
 
     // an interrupt will change sepc, scause, and sstatus,
     // so enable only now that we're done with those registers.
@@ -77,6 +81,10 @@ usertrap(void)
   if(killed(p))
     exit(-1);
 
+  if(t->killed)
+    {
+      kthread_exit(-1);
+    }
     
 
   // give up the CPU if this is a timer interrupt.

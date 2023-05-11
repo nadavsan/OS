@@ -84,12 +84,10 @@ mycpu(void)
 struct proc *
 myproc(void)
 {
-  push_off();
   struct cpu *c = mycpu();
   struct proc *p = 0;
   if (c->kthread)
     p = c->kthread->p;
-  pop_off(); // TODO: might need to delete this.
   return p;
 }
 
@@ -262,12 +260,13 @@ void userinit(void)
   p->sz = PGSIZE;
 
   // prepare for the very first "return" from kernel to user.
-  p->kthread[0].trapframe->epc = 0;     // user program counter
-  p->kthread[0].trapframe->sp = PGSIZE; // user stack pointer
+  p->kthread->trapframe->epc = 0;     // user program counter
+  p->kthread->trapframe->sp = PGSIZE; // user stack pointer
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
+  p->state=USED;
   p->kthread[0].state = RUNNABLE;
   release(&p->kthread->lock);
   release(&p->lock);
@@ -351,9 +350,9 @@ int fork(void)
   np->state = USED;
   release(&np->lock);
 
-  acquire(&np->kthread[0].lock);
+  acquire(&np->kthread->lock);
   np->kthread[0].state = TRUNNABLE;
-  release(&np->kthread[0].lock);
+  release(&np->kthread->lock);
 
   return pid;
 }
@@ -392,15 +391,17 @@ void exit(int status)
   {
     if (t->state != TUNUSED && t->state != TZOMBIE && t != mykthread())
     {
-      kill(t->tid);
+      kthread_kill(t->tid);
     }
   }
-  // for(t = p->kthread; t < &p->kthread[NKT]; t++) {
-  //   if(t->state != TUNUSED && mykthread()!=t)
-  //   {
+  for (t = p->kthread; t < &p->kthread[NKT]; t++){
+    int ktid = t->tid;
+     if(t->state != TUNUSED && t != mykthread() )
+     {
+        kthread_join(ktid,0);
+     }
 
-  //   }
-
+  }
   if (p == initproc)
     panic("init exiting");
 

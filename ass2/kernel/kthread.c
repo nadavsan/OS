@@ -7,12 +7,13 @@
 #include "defs.h"
 
 extern struct proc proc[NPROC];
+struct spinlock threadlock;
 
 void kthreadinit(struct proc *p)
 {
   acquire(&p->lock);
   initlock(&p->tid_lock, "tcount lock");
-  // another lock required??
+  initlock(&threadlock, "tlock");
 
   for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
@@ -100,24 +101,124 @@ void clearContext(struct kthread *kt)
 {
   memset(&kt->context, 0, sizeof(kt->context));
 }
+// sys_exit(void) - Related original proc system call
+// {
+//   int n;
+//   argint(0, &n);
+//   exit(n);
+//   return 0; // not reached
+// }
+void kthread_exit(int status){
+  
+  struct proc *p = myproc();
+  struct kthread *t = mykthread();
+  struct kthread *currentt;
+  acquire(&threadlock);
+  wakeup(t);
+
+  //the lock in the thread
+  acquire(&t->lock);
+  t->state = TZOMBIE;
+  t->xstate = status;
+  uint64 flag = 1;
+  
+  for (currentt = p->kthread; currentt < &p->kthread[NKT]; currentt++){
+    if(currentt != t){
+      acquire(&currentt->lock);
+      if(currentt->state != TUNUSED && currentt->state != TZOMBIE){
+        flag = 0;
+      }
+      
+
+      release(&currentt->lock);
+    }
+  
+  }
+  release(&threadlock);
+  if(flag){
+    release(&t->lock);
+    exit(status);
+  }
+  
+  sched();
+  panic("zombie exit");
+}
+
+
+
+int kthread_kill(int ktid){
+  struct proc *p = myproc();
+  for (struct kthread *t = p->kthread; t < &p->kthread[NKT]; t++){
+    if(t->tid == ktid){
+      acquire(&t->lock);
+      t->killed = 1;
+      if(t->state == TSLEEPING){
+        t->state = TRUNNABLE;
+      }
+      release(&t->lock);
+      release(&p->lock);
+      return 0;
+    }
+  }
+  return -1;
+}
+
+int kthread_join(int ktid, uint64 status){
+  struct kthread *t ;
+  struct proc *p = myproc();
+  int onerror = -1;
+
+  for (t = p->kthread; t < &p->kthread[NKT]; t++)
+  {
+    if(t->tid == ktid){
+      goto same;
+    }
+  }
+
+  same:
+  if(t->tid == ktid){
+  acquire(&threadlock);
+  for(;;)
+  {
+    acquire(&t->lock);
+    if(t->state == TZOMBIE){
+        if((copyout(p->pagetable, status, (char *)&t->xstate, sizeof(t->xstate)) < 0) && (status != 0 )) {                    
+            release(&t->lock);
+            release(&threadlock);
+            return onerror;
+            }
+        freekt(t);
+
+          //handle locks
+        release(&t->lock);
+        release(&threadlock);
+        return 0;
+    }
+        release(&t->lock);
+        sleep(t, &threadlock);
+    }
+  }
+  return onerror;
+  }
 
 int kthread_create( void *(*start_func)(), void *stack, uint stack_size){
   struct proc *p = myproc();
   int tid;
   struct kthread *createt;
   
-  createt = allockthread(p);
+  createt = allockt(p);
   // Allocate kthread
   if(createt  == 0){
     return -1;
   }
- 
-  createt->trapframe->epc = (uint64)start_func;
   createt->trapframe->sp = (uint64)stack + stack_size;
+  createt->trapframe->epc = (uint64)start_func;
   tid = createt->tid;
   createt->state = RUNNABLE;
   release(&createt->lock);
   return tid;
+}
 
-
+int kthread_id(void){
+  return mykthread()->tid;
 }

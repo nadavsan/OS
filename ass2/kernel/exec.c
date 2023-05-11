@@ -31,6 +31,7 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
   struct kthread *kt = mykthread();
+  struct kthread *t;
 
   begin_op();
 
@@ -122,6 +123,22 @@ exec(char *path, char **argv)
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
     
+  
+  for (t = p->kthread; t < &p->kthread[NKT]; t++)
+  {
+    if((t != mykthread()) && (t->state != TZOMBIE) && (t->state != TUNUSED))
+    {
+      kthread_kill(t->tid);
+    }
+    
+  }
+  for (t = p->kthread; t < &p->kthread[NKT]; t++){
+     if(t->state != TUNUSED && t != mykthread())
+     {
+        kthread_join(t->tid,0);  
+     }
+  }
+
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
