@@ -86,9 +86,11 @@ myproc(void)
 {
   struct cpu *c = mycpu();
   struct proc *p = 0;
-  if (c->kthread)
+  if (c->kthread){
     p = c->kthread->p;
-  return p;
+    return p;
+  }
+  return 0;
 }
 
 int allocpid()
@@ -574,11 +576,13 @@ void sched(void)
 // Give up the CPU for one scheduling round.
 void yield(void)
 {
-  struct proc *p = myproc();
-  acquire(&p->lock);
-  p->state = RUNNABLE;
+  //struct proc *p = myproc();
+  struct kthread* t = mykthread();
+  acquire(&t->lock);
+  //acquire(&p->lock);
+  t->state = TRUNNABLE;
   sched();
-  release(&p->lock);
+  release(&t->lock);
 }
 
 // A fork child's very first scheduling by scheduler()
@@ -688,6 +692,13 @@ void setkilled(struct proc *p)
 {
   acquire(&p->lock);
   p->killed = 1;
+  for(struct kthread *t=p->kthread; t<&p->kthread[NKT]; t++)
+  {
+    acquire(&t->lock);
+    t->killed = 1;
+    release(&t->lock);
+  }
+
   release(&p->lock);
 }
 

@@ -68,38 +68,38 @@ struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 
 struct kthread *allockt(struct proc *p)
 {
-  struct kthread *kt;
+  struct kthread *t;
 
-  for (kt=p->kthread; kt<&p->kthread[NKT];kt++)
+  for (t=p->kthread; t<&p->kthread[NKT];t++)
   {
-    acquire(&kt->lock);
-    if(kt->state==TUNUSED)
+    acquire(&t->lock);
+    if(t->state==TUNUSED)
     {
-      kt->tid=allocktid(p);
-      kt->state=TUSED;
-      kt->trapframe=get_kthread_trapframe(p, kt);
+      t->tid=allocktid(p);
+      t->state=TUSED;
+      t->trapframe=get_kthread_trapframe(p, t);
       break;
     }
     else
     {
-      release(&kt->lock);
+      release(&t->lock);
     }
 
   }
-  if(kt<&p->kthread[NKT])
+  if(t<&p->kthread[NKT])
   {
-    clearContext(kt);
-    kt->context.ra=(uint64)forkret;
-    kt->context.sp=kt->kstack+PGSIZE;
-    return kt;
+    clearContext(t);
+    return t;
   }
   return 0;
 
 }
 
-void clearContext(struct kthread *kt)
+void clearContext(struct kthread *t)
 {
-  memset(&kt->context, 0, sizeof(kt->context));
+  memset(&t->context, 0, sizeof(t->context));
+  t->context.ra=(uint64)forkret;
+  t->context.sp=t->kstack+PGSIZE;
 }
 // sys_exit(void) - Related original proc system call
 // {
@@ -141,7 +141,7 @@ void kthread_exit(int status){
   }
   
   sched();
-  panic("zombie exit");
+  panic("zombie");
 }
 
 
@@ -211,8 +211,9 @@ int kthread_create( void *(*start_func)(), void *stack, uint stack_size){
   if(createt  == 0){
     return -1;
   }
-  createt->trapframe->sp = (uint64)stack + stack_size;
   createt->trapframe->epc = (uint64)start_func;
+  createt->trapframe->sp = (uint64)stack + stack_size;
+  
   tid = createt->tid;
   createt->state = RUNNABLE;
   release(&createt->lock);
