@@ -505,7 +505,7 @@ sys_pipe(void)
 }
 
 uint64
-seek(void) {
+sys_seek(void) {
   int whence;
   int offset;
   struct file *f;
