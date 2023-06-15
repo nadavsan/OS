@@ -185,5 +185,9 @@ void            virtio_disk_init(void);
 void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
 
+//random.c
+void            randominit(void);
+uint8           lfsr_char(uint8 lfsr);
+
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

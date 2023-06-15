@@ -20,6 +20,8 @@ main(void)
     mknod("console", CONSOLE, 0);
     open("console", O_RDWR);
   }
+  mknod ("random", RANDOM, 0);
+
   dup(0);  // stdout
   dup(0);  // stderr
 
